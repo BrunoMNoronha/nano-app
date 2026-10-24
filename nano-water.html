@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f8fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1620" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Registro de hidratação diária com meta configurável. Offline, sem conta.">
+<title>nano-water</title>
+<style>
+/* ===== Tokens ===== */
+:root {
+  --bg: #f4f8fb;
+  --surface: #ffffff;
+  --text: #13212e;
+  --muted: #5b6b7a;
+  --line: #dde5ec;
+  --accent: #1f7ae0;
+  --accent-soft: #e3effc;
+  --done: #1a9a5c;
+  --radius: 16px;
+  --tap: 48px;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1620;
+    --surface: #16222e;
+    --text: #e6edf3;
+    --muted: #93a3b3;
+    --line: #253443;
+    --accent: #5aa6ff;
+    --accent-soft: #1b3047;
+    --done: #3ccf8a;
+  }
+}
+
+/* ===== Base ===== */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ===== Layout ===== */
+.app {
+  max-width: 480px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+header { display: flex; align-items: center; justify-content: space-between; }
+h1 { font-size: 1.25rem; margin: 0; }
+h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+/* Ações ficam no fim para alcance do polegar */
+.actions { margin-top: auto; display: flex; flex-direction: column; gap: 12px; }
+
+/* ===== Componentes ===== */
+.icon-btn {
+  width: var(--tap); height: var(--tap);
+  border: 1px solid var(--line); border-radius: 50%;
+  background: var(--surface);
+  display: grid; place-items: center;
+}
+.icon-btn svg { width: 22px; height: 22px; }
+
+.progress { display: grid; place-items: center; position: relative; }
+.ring { width: 220px; height: 220px; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 16; }
+.ring .track { stroke: var(--accent-soft); }
+.ring .bar { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .4s ease; }
+.ring.is-done .bar { stroke: var(--done); }
+.progress-label { position: absolute; text-align: center; }
+.progress-total { font-size: 2.25rem; font-weight: 700; display: block; }
+.progress-goal { color: var(--muted); }
+
+.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.btn {
+  min-height: var(--tap);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 600;
+}
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-ghost { background: transparent; }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn:active:not(:disabled) { transform: scale(.97); }
+
+.row { display: flex; gap: 8px; }
+.row > input { flex: 1; min-width: 0; }
+.field {
+  min-height: var(--tap);
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 120px; }
+.day { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.day-bar { width: 100%; max-width: 28px; border-radius: 6px 6px 2px 2px; background: var(--accent); min-height: 3px; }
+.day-bar.is-done { background: var(--done); }
+.day-name { font-size: .75rem; color: var(--muted); }
+.day.is-today .day-name { color: var(--text); font-weight: 700; }
+
+.log { list-style: none; margin: 0; padding: 0; color: var(--muted); font-size: .9rem; }
+.log li { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--line); }
+.log li:first-child { border-top: 0; }
+
+dialog {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); color: var(--text);
+  width: min(92vw, 360px); padding: 20px;
+}
+dialog::backdrop { background: rgb(0 0 0 / .4); }
+dialog form { display: flex; flex-direction: column; gap: 12px; }
+dialog label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
+
+/* ===== Estados ===== */
+.toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  background: var(--text); color: var(--bg);
+  padding: 10px 16px; border-radius: 999px; font-size: .9rem;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.toast.is-visible { opacity: 1; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>💧 nano-water</h1>
+    <button class="icon-btn" id="open-settings" aria-label="Configurar meta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+      </svg>
+    </button>
+  </header>
+
+  <main class="card progress" aria-live="polite">
+    <svg class="ring" id="ring" viewBox="0 0 200 200" aria-hidden="true">
+      <circle class="track" cx="100" cy="100" r="88"/>
+      <circle class="bar" id="ring-bar" cx="100" cy="100" r="88"/>
+    </svg>
+    <div class="progress-label">
+      <span class="progress-total" id="total">0 ml</span>
+      <span class="progress-goal" id="goal-label">de 2000 ml</span>
+    </div>
+  </main>
+
+  <section class="card" aria-labelledby="week-title">
+    <h2 id="week-title">Últimos 7 dias</h2>
+    <div class="week" id="week"></div>
+  </section>
+
+  <section class="card" aria-labelledby="log-title">
+    <h2 id="log-title">Hoje</h2>
+    <ul class="log" id="log"></ul>
+  </section>
+
+  <div class="actions">
+    <div class="quick" id="quick"></div>
+    <form class="row" id="custom-form">
+      <label for="custom-ml" class="sr-only">Quantidade personalizada em ml</label>
+      <input class="field" id="custom-ml" type="number" inputmode="numeric" min="1" max="5000" placeholder="Outro valor (ml)">
+      <button class="btn btn-primary" type="submit" style="padding:0 20px">Adicionar</button>
+    </form>
+    <button class="btn btn-ghost" id="undo" type="button">Desfazer último</button>
+  </div>
+</div>
+
+<dialog id="settings">
+  <form method="dialog" id="settings-form">
+    <h2 style="color:var(--text)">Meta diária</h2>
+    <label>Meta (ml)
+      <input class="field" id="goal-input" type="number" inputmode="numeric" min="250" max="10000" step="50" required>
+    </label>
+    <div class="row">
+      <button class="btn" value="cancel" formnovalidate style="flex:1">Cancelar</button>
+      <button class="btn btn-primary" value="save" style="flex:1">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+
+// ===== Constantes =====
+const STORAGE_KEY = 'nano-water:data';
+const SCHEMA_VERSION = 1;
+const DEFAULT_GOAL = 2000;
+const QUICK_AMOUNTS = [200, 300, 500];
+const HISTORY_DAYS = 30;
+const RING_LENGTH = 2 * Math.PI * 88;
+const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+const $ = (id) => document.getElementById(id);
+
+// ===== Estado =====
+let state = loadState();
+let currentDay = dayKey(new Date());
+
+// ===== Storage =====
+function emptyState() {
+  return { v: SCHEMA_VERSION, goal: DEFAULT_GOAL, days: {} };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? migrate(JSON.parse(raw)) : emptyState();
+  } catch {
+    return emptyState();
+  }
+}
+
+function migrate(data) {
+  if (!data || typeof data !== 'object' || !data.days) return emptyState();
+  // Futuras versões de schema são convertidas aqui.
+  return { ...emptyState(), ...data, v: SCHEMA_VERSION };
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    showToast('Não foi possível salvar neste navegador');
+  }
+}
+
+// ===== Domínio =====
+function dayKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function entriesFor(key) {
+  return state.days[key] || [];
+}
+
+function totalFor(key) {
+  return entriesFor(key).reduce((sum, e) => sum + e.ml, 0);
+}
+
+function addWater(ml) {
+  if (!Number.isFinite(ml) || ml <= 0) return;
+  const key = dayKey(new Date());
+  state.days[key] = [...entriesFor(key), { t: Date.now(), ml }];
+  pruneHistory();
+  saveState();
+  render();
+  showToast(`+${ml} ml`);
+}
+
+function undoLast() {
+  const key = dayKey(new Date());
+  const entries = entriesFor(key);
+  if (!entries.length) return;
+  const removed = entries[entries.length - 1];
+  state.days[key] = entries.slice(0, -1);
+  saveState();
+  render();
+  showToast(`Removido ${removed.ml} ml`);
+}
+
+function setGoal(ml) {
+  state.goal = ml;
+  saveState();
+  render();
+}
+
+function pruneHistory() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - HISTORY_DAYS);
+  const cutoffKey = dayKey(cutoff);
+  for (const key of Object.keys(state.days)) {
+    if (key < cutoffKey) delete state.days[key];
+  }
+}
+
+function lastSevenDays() {
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d);
+  }
+  return days;
+}
+
+// ===== Render =====
+function render() {
+  const key = dayKey(new Date());
+  renderProgress(totalFor(key));
+  renderWeek(key);
+  renderLog(entriesFor(key));
+  $('undo').disabled = entriesFor(key).length === 0;
+}
+
+function renderProgress(total) {
+  const ratio = Math.min(total / state.goal, 1);
+  $('ring-bar').style.strokeDasharray = RING_LENGTH;
+  $('ring-bar').style.strokeDashoffset = RING_LENGTH * (1 - ratio);
+  $('ring').classList.toggle('is-done', total >= state.goal);
+  $('total').textContent = `${total} ml`;
+  $('goal-label').textContent = total >= state.goal
+    ? `Meta de ${state.goal} ml batida 🎉`
+    : `de ${state.goal} ml · faltam ${state.goal - total}`;
+}
+
+function renderWeek(todayKey) {
+  const week = $('week');
+  week.replaceChildren(...lastSevenDays().map((date) => {
+    const key = dayKey(date);
+    const total = totalFor(key);
+    const pct = Math.min(total / state.goal, 1) * 100;
+    const col = document.createElement('div');
+    col.className = 'day' + (key === todayKey ? ' is-today' : '');
+    col.setAttribute('aria-label', `${WEEKDAYS[date.getDay()]}: ${total} ml`);
+    const bar = document.createElement('div');
+    bar.className = 'day-bar' + (total >= state.goal ? ' is-done' : '');
+    bar.style.height = `${pct}%`;
+    const name = document.createElement('span');
+    name.className = 'day-name';
+    name.textContent = WEEKDAYS[date.getDay()];
+    col.append(bar, name);
+    return col;
+  }));
+}
+
+function renderLog(entries) {
+  const log = $('log');
+  if (!entries.length) {
+    const li = document.createElement('li');
+    li.textContent = 'Nenhum registro ainda.';
+    log.replaceChildren(li);
+    return;
+  }
+  log.replaceChildren(...entries.slice().reverse().map((e) => {
+    const li = document.createElement('li');
+    const time = new Date(e.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    li.innerHTML = `<span></span><strong></strong>`;
+    li.firstChild.textContent = time;
+    li.lastChild.textContent = `${e.ml} ml`;
+    return li;
+  }));
+}
+
+function renderQuickButtons() {
+  $('quick').replaceChildren(...QUICK_AMOUNTS.map((ml) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary';
+    btn.type = 'button';
+    btn.textContent = `+${ml} ml`;
+    btn.addEventListener('click', () => addWater(ml));
+    return btn;
+  }));
+}
+
+let toastTimer;
+function showToast(message) {
+  const toast = $('toast');
+  toast.textContent = message;
+  toast.classList.add('is-visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 1600);
+}
+
+// ===== Eventos =====
+function bindEvents() {
+  $('custom-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = $('custom-ml');
+    const ml = Math.round(Number(input.value));
+    if (ml > 0 && ml <= 5000) {
+      addWater(ml);
+      input.value = '';
+      input.blur();
+    }
+  });
+
+  $('undo').addEventListener('click', undoLast);
+
+  $('open-settings').addEventListener('click', () => {
+    $('goal-input').value = state.goal;
+    $('settings').showModal();
+  });
+
+  $('settings').addEventListener('close', () => {
+    const ml = Math.round(Number($('goal-input').value));
+    if ($('settings').returnValue === 'save' && ml >= 250) setGoal(ml);
+  });
+
+  // Virada do dia: re-renderiza ao voltar para o app ou a cada minuto.
+  const checkDayChange = () => {
+    const key = dayKey(new Date());
+    if (key !== currentDay) {
+      currentDay = key;
+      render();
+    }
+  };
+  document.addEventListener('visibilitychange', checkDayChange);
+  setInterval(checkDayChange, 60_000);
+}
+
+// ===== Init =====
+function init() {
+  renderQuickButtons();
+  bindEvents();
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
