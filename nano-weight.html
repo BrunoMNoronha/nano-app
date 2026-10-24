@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eef6f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101b1b" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:,">
+<title>nano-weight · Pesagens</title>
+<style>
+/* Tokens */
+:root { color-scheme: light dark; --bg:#eef6f5; --card:#fff; --ink:#142b2a; --muted:#486461; --line:#c9dcd9; --accent:#087265; --on:#fff; --soft:#d8f0eb; --danger:#a33434; }
+@media (prefers-color-scheme:dark) { :root { --bg:#101b1b; --card:#192b2a; --ink:#ecf6f4; --muted:#b1cbc6; --line:#3c5955; --accent:#69d9c4; --on:#10201d; --soft:#25443e; --danger:#ffaaa7; } }
+/* Base */
+* { box-sizing:border-box; }
+html,body { margin:0; }
+body { background:var(--bg); color:var(--ink); font:16px/1.45 system-ui,-apple-system,sans-serif; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+button,input,select { font:inherit; }
+button { cursor:pointer; }
+button:disabled { opacity:.5; cursor:not-allowed; }
+:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+/* Layout */
+.app { max-width:560px; min-height:100dvh; margin:auto; padding:20px 16px calc(24px + env(safe-area-inset-bottom)); display:grid; align-content:start; gap:16px; }
+header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+h1 { font-size:1.45rem; margin:0; }
+h2 { font-size:1.06rem; margin:0 0 12px; }
+p { margin:0 0 12px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px; min-width:0; }
+.row { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.stack { display:grid; gap:10px; }
+/* Componentes */
+.btn { min-height:48px; padding:10px 16px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-weight:650; }
+.primary { background:var(--accent); border-color:var(--accent); color:var(--on); }
+.field { min-width:0; width:100%; min-height:48px; border:1px solid var(--line); border-radius:12px; background:var(--bg); color:var(--ink); padding:8px 12px; }
+label { display:grid; gap:5px; font-weight:600; }
+small,.muted { color:var(--muted); }
+.hero { text-align:center; padding:24px 18px; }
+.value { display:block; font-size:clamp(2.8rem,12vw,4.5rem); font-weight:750; font-variant-numeric:tabular-nums; line-height:1.1; margin:12px 0; }
+.status { display:inline-block; padding:6px 12px; border-radius:999px; background:var(--soft); color:var(--ink); font-size:.9rem; }
+.list { list-style:none; padding:0; margin:0; }
+.list li { display:flex; align-items:center; justify-content:space-between; gap:12px; border-top:1px solid var(--line); padding:10px 0; }
+.list li:first-child { border:0; }
+.mini { min-height:44px; min-width:44px; padding:8px; color:var(--danger); }
+.mono { font: .8rem/1.45 ui-monospace,SFMono-Regular,monospace; overflow-wrap:anywhere; }
+pre { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; max-height:240px; overflow-y:auto; }
+details summary { min-height:44px; cursor:pointer; padding:8px 0; font-weight:650; }
+/* Estados */
+[hidden] { display:none!important; }
+.note { border-left:4px solid var(--accent); padding-left:12px; }
+.error { color:var(--danger); }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; } }
+</style>
+</head>
+<body>
+<div class="app">
+<header><h1>nano-weight</h1><span aria-hidden="true">⚖</span></header>
+<main class="stack">
+<section class="card hero" aria-labelledby="current-title">
+<h2 id="current-title">Última pesagem</h2>
+<output class="value" id="latest">—</output>
+<p class="muted" id="latest-date">Sem pesagens salvas</p>
+<span class="status" id="status" role="status">Desconectado</span>
+</section>
+<section class="card stack" aria-labelledby="connect-title">
+<h2 id="connect-title">Ler balança</h2>
+<p class="muted">Ligue a balança e toque em conectar. A seleção do aparelho é feita pelo navegador.</p>
+<div class="row"><button class="btn primary" id="connect" type="button">Conectar balança</button><button class="btn" id="disconnect" type="button" disabled>Desconectar</button></div>
+<p id="support" class="note" hidden></p>
+<div id="candidate-box" hidden class="stack"><p>Leitura recebida: <strong id="candidate"></strong></p><div class="row"><button class="btn primary" id="save-candidate" type="button">Salvar pesagem</button><button class="btn" id="discard-candidate" type="button">Descartar</button></div></div>
+</section>
+<section class="card stack" aria-labelledby="manual-title">
+<h2 id="manual-title">Registrar manualmente</h2>
+<form id="manual-form" class="stack"><label for="manual-weight">Peso em kg<input class="field" id="manual-weight" type="number" inputmode="decimal" min="1" max="500" step="0.01" required placeholder="Ex.: 74,50"></label><button class="btn" type="submit">Salvar registro</button></form>
+</section>
+<section class="card" aria-labelledby="history-title"><h2 id="history-title">Histórico</h2><ul class="list" id="history"></ul></section>
+<details class="card" id="diagnostics"><summary>Diagnóstico Bluetooth</summary>
+<p class="muted">Caso a leitura padrão não funcione, conecte em modo exploratório e copie o relatório. UUIDs personalizados permitem escutar um serviço conhecido, mas dados sem formato documentado não serão interpretados como peso.</p>
+<div class="stack">
+<label for="service-uuid">UUID do serviço personalizado (opcional)<input class="field mono" id="service-uuid" autocomplete="off" placeholder="Ex.: 1234 ou UUID completo"></label>
+<label for="characteristic-uuid">UUID da característica para leitura (opcional)<input class="field mono" id="characteristic-uuid" autocomplete="off" placeholder="Ex.: abcd ou UUID completo"></label>
+<button class="btn" id="explore" type="button">Explorar dispositivo BLE</button>
+<pre class="mono" id="report" aria-live="polite">Nenhuma coleta nesta sessão.</pre>
+<button class="btn" id="copy-report" type="button">Copiar relatório</button>
+</div></details>
+<p id="storage-warning" class="error" role="status" hidden>Armazenamento indisponível. Os registros desta sessão podem se perder ao recarregar.</p>
+</main>
+</div>
+<script>
+'use strict';
+// Constantes e estado
+const KEY = 'nano-weight:data';
+const VERSION = 1;
+const WEIGHT_SERVICE = 0x181d;
+const BODY_SERVICE = 0x181b;
+const DEVICE_SERVICE = 0x180a;
+const WEIGHT_CHAR = 0x2a9d;
+const BODY_CHAR = 0x2a9c;
+const $ = id => document.getElementById(id);
+let records = loadRecords();
+let device = null;
+let listeners = [];
+let candidate = null;
+let lastPacket = '';
+let report = [];
+let busy = false;
+// Persistência
+function loadRecords() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(KEY));
+    if (parsed?.version !== VERSION || !Array.isArray(parsed.records)) return [];
+    return parsed.records.filter(r => Number.isFinite(r.kg) && r.kg >= 1 && r.kg <= 500 && Number.isFinite(r.at) && r.at > 0).slice(-1000);
+  } catch { return []; }
+}
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify({version:VERSION, records})); $('storage-warning').hidden = true; }
+  catch { $('storage-warning').hidden = false; }
+}
+// Domínio
+function validWeight(kg) { return Number.isFinite(kg) && kg >= 1 && kg <= 500; }
+function formatKg(kg) { return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:2}).format(kg) + ' kg'; }
+function formatDate(at) { return new Date(at).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}); }
+function saveWeight(kg, source, at = Date.now()) {
+  if (!validWeight(kg)) return;
+  if (records.some(r => r.source === source && r.at === at && r.kg === kg)) return;
+  records.push({kg:Math.round(kg * 100) / 100, at, source});
+  records.sort((a,b) => a.at - b.at);
+  records = records.slice(-1000);
+  persist(); render();
+}
+// Decodificação do serviço de peso Bluetooth SIG: flag, uint16 LE, resolução SI .005 kg / imperial .01 lb.
+function parseStandardWeight(value) {
+  if (value.byteLength < 3) return null;
+  const flags = value.getUint8(0);
+  const raw = value.getUint16(1,true);
+  if (raw === 0xffff) return null;
+  const kg = flags & 1 ? raw * .01 * .45359237 : raw * .005;
+  if (!validWeight(kg)) return null;
+  let at = Date.now();
+  if (flags & 2 && value.byteLength >= 10) {
+    const year = value.getUint16(3,true), month = value.getUint8(5), day = value.getUint8(6);
+    const hour = value.getUint8(7), minute = value.getUint8(8), second = value.getUint8(9);
+    const stamp = new Date(year,month-1,day,hour,minute,second);
+    if (stamp.getFullYear() === year && stamp.getMonth() === month-1 && stamp.getDate() === day &&
+        Math.abs(stamp.getTime() - Date.now()) < 86400_000) at = stamp.getTime();
+  }
+  return {kg:Math.round(kg*100)/100,at};
+}
+function hex(value) { return Array.from(new Uint8Array(value.buffer,value.byteOffset,value.byteLength),b=>b.toString(16).padStart(2,'0')).join(' '); }
+function setStatus(message) { $('status').textContent = message; }
+function log(message) {
+  report.push(`${new Date().toLocaleTimeString('pt-BR')} ${message}`);
+  report = report.slice(-80);
+  $('report').textContent = report.join('\n');
+}
+function receive(value, name, standard = false) {
+  const bytes = hex(value);
+  log(`${name}: ${bytes}`);
+  if (!standard) return;
+  const result = parseStandardWeight(value);
+  if (!result) { log('Pacote padrão sem peso válido.'); return; }
+  const signature = `${device?.id}:${result.at}:${result.kg}:${bytes}`;
+  if (signature === lastPacket) return;
+  lastPacket = signature;
+  candidate = result;
+  $('candidate').textContent = formatKg(result.kg);
+  $('candidate-box').hidden = false;
+  setStatus('Pesagem recebida; confirme para salvar');
+}
+function cleanup() {
+  for (const [characteristic,handler] of listeners) characteristic.removeEventListener('characteristicvaluechanged',handler);
+  listeners = [];
+  device = null;
+  $('disconnect').disabled = true;
+  setStatus('Desconectado');
+}
+function disconnect() {
+  const old = device;
+  cleanup();
+  if (old?.gatt?.connected) old.gatt.disconnect();
+}
+function uuid(input) {
+  const value = input.trim().toLowerCase();
+  if (!value) return null;
+  if (/^[0-9a-f]{4}$/.test(value)) return parseInt(value,16);
+  if (/^[0-9a-f]{8}$/.test(value) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)) return value;
+  throw new Error('UUID inválido: use 4 ou 8 dígitos hexadecimais ou UUID completo.');
+}
+async function inspectService(server, serviceId, charId, standard) {
+  let service;
+  try { service = await server.getPrimaryService(serviceId); }
+  catch (error) { log(`Serviço ${serviceId} indisponível: ${error.name}`); return false; }
+  log(`Serviço encontrado: ${service.uuid}`);
+  const characteristics = charId ? [await service.getCharacteristic(charId)] : await service.getCharacteristics();
+  for (const characteristic of characteristics) {
+    const name = `${service.uuid} / ${characteristic.uuid}`;
+    log(`Característica ${name} (read=${characteristic.properties.read}, notify=${characteristic.properties.notify}, indicate=${characteristic.properties.indicate})`);
+    const isWeight = standard && characteristic.uuid.toLowerCase().startsWith('00002a9d-');
+    if (characteristic.properties.notify || characteristic.properties.indicate) {
+      try {
+        const handler = event => receive(event.target.value,name,isWeight);
+        characteristic.addEventListener('characteristicvaluechanged',handler);
+        await characteristic.startNotifications();
+        listeners.push([characteristic,handler]);
+        log(`Escutando ${name}`);
+      } catch (error) { log(`Falha ao escutar: ${error.name}`); }
+    }
+    if (characteristic.properties.read) {
+      try { receive(await characteristic.readValue(),name,isWeight); }
+      catch (error) { log(`Falha ao ler: ${error.name}`); }
+    }
+  }
+  return true;
+}
+async function connect(explore) {
+  if (busy) return;
+  if (!navigator.bluetooth) { $('support').hidden = false; $('support').textContent = 'Este navegador não oferece Web Bluetooth. Use Chrome no Android ou Chromium compatível; registro manual segue disponível.'; return; }
+  let customService,customChar;
+  try {
+    customService = explore ? uuid($('service-uuid').value) : null;
+    customChar = explore ? uuid($('characteristic-uuid').value) : null;
+    if (customChar && !customService) throw new Error('Informe também o UUID do serviço.');
+  } catch(error) { setStatus(error.message); return; }
+  // requestDevice deve ser iniciado diretamente pelo toque, antes de qualquer await.
+  let selection;
+  try {
+    selection = navigator.bluetooth.requestDevice({
+      ...(explore ? {acceptAllDevices:true} : {filters:[{services:[WEIGHT_SERVICE]},{services:[BODY_SERVICE]}]}),
+      optionalServices:[WEIGHT_SERVICE,BODY_SERVICE,DEVICE_SERVICE,...(customService?[customService]:[])]
+    });
+  } catch(error) { setStatus(`Seleção falhou: ${error.message}`); return; }
+  busy = true; $('connect').disabled = true; $('explore').disabled = true;
+  try {
+    disconnect();
+    device = await selection;
+    device.addEventListener('gattserverdisconnected',onDisconnected);
+    log(`Dispositivo selecionado: ${device.name || 'sem nome'}`);
+    setStatus('Conectando…');
+    const server = await device.gatt.connect();
+    $('disconnect').disabled = false;
+    const standard = await inspectService(server,WEIGHT_SERVICE,WEIGHT_CHAR,true);
+    if (explore || !standard) await inspectService(server,BODY_SERVICE,BODY_CHAR,false);
+    if (customService) await inspectService(server,customService,customChar,false);
+    setStatus(standard ? 'Conectado; suba na balança' : 'Conectado; veja o diagnóstico');
+  } catch(error) {
+    if (error.name !== 'NotFoundError') { log(`Erro: ${error.name}: ${error.message}`); setStatus(`Falha: ${error.message}`); }
+    else setStatus('Seleção cancelada');
+    const message = $('status').textContent;
+    disconnect();
+    setStatus(message);
+  } finally { busy = false; $('connect').disabled = false; $('explore').disabled = false; }
+}
+function onDisconnected() { cleanup(); log('Dispositivo desconectado.'); }
+// Interface
+function render() {
+  const last = records.at(-1);
+  $('latest').textContent = last ? formatKg(last.kg) : '—';
+  $('latest-date').textContent = last ? formatDate(last.at) : 'Sem pesagens salvas';
+  const items = records.slice().reverse().slice(0,30).map(record => {
+    const li = document.createElement('li');
+    const info = document.createElement('span');
+    const strong = document.createElement('strong'); strong.textContent = formatKg(record.kg);
+    const detail = document.createElement('small'); detail.textContent = ` · ${formatDate(record.at)} · ${record.source === 'ble' ? 'Bluetooth' : 'manual'}`;
+    info.append(strong,detail);
+    const remove = document.createElement('button');
+    remove.className = 'btn mini'; remove.type = 'button'; remove.textContent = 'Excluir';
+    remove.setAttribute('aria-label',`Excluir pesagem de ${formatKg(record.kg)} em ${formatDate(record.at)}`);
+    remove.addEventListener('click',() => { if (!confirm('Excluir esta pesagem?')) return; records.splice(records.indexOf(record),1); persist(); render(); });
+    li.append(info,remove); return li;
+  });
+  $('history').replaceChildren(...items);
+  if (!items.length) $('history').textContent = 'Nenhum registro ainda.';
+}
+function bindEvents() {
+  $('connect').addEventListener('click',() => connect(false));
+  $('explore').addEventListener('click',() => connect(true));
+  $('disconnect').addEventListener('click',disconnect);
+  $('save-candidate').addEventListener('click',() => { if (!candidate) return; saveWeight(candidate.kg,'ble',candidate.at); candidate = null; $('candidate-box').hidden = true; setStatus('Pesagem salva'); });
+  $('discard-candidate').addEventListener('click',() => { candidate = null; $('candidate-box').hidden = true; });
+  $('manual-form').addEventListener('submit',event => { event.preventDefault(); const input = $('manual-weight'); const kg = Number(input.value); if (!validWeight(kg)) { input.setCustomValidity('Informe um peso entre 1 e 500 kg.'); input.reportValidity(); return; } saveWeight(kg,'manual'); input.value = ''; });
+  $('manual-weight').addEventListener('input',event => event.target.setCustomValidity(''));
+  $('copy-report').addEventListener('click',async () => {
+    try { await navigator.clipboard.writeText($('report').textContent); setStatus('Relatório copiado'); }
+    catch { setStatus('Selecione e copie o relatório manualmente'); }
+  });
+}
+render(); bindEvents();
+</script>
+</body>
+</html>
