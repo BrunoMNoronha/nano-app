@@ -24,9 +24,11 @@ A restrição é o produto. Cada app caber em um único `.html` parece arbitrár
 
 ## Apps disponíveis
 
-No momento o repositório contém um app:
+No momento o repositório contém os seguintes apps:
 
 `nano-meds.html` — Gestão de remédios com marcação de doses diárias. Você cadastra cada remédio (nome, dosagem, frequência), e o app gera cápsulas tocáveis para registrar cada dose tomada ao longo do dia. As cápsulas resetam automaticamente na virada do dia, e o histórico recente fica armazenado localmente para futuras visualizações de adesão.
+
+`nano-water.html` — Registro de hidratação diária com meta configurável. Botões rápidos (200/300/500 ml) ou valor livre, anel de progresso do dia, desfazer o último registro e barras dos últimos 7 dias; o histórico de 30 dias fica salvo localmente.
 
 Outros apps estão planejados — veja a seção [Roadmap](#roadmap).
 
@@ -104,7 +106,7 @@ Para ajustes em apps existentes (correções, melhorias de UX, otimizações), o
 
 A lista abaixo são ideias planejadas, sem ordem fixa nem compromisso de prazo. Servem mais para indicar a direção e convidar contribuições do que para prometer entregas.
 
-`nano-meds` — pronto. `nano-water` — registro de hidratação diária com meta configurável. `nano-mood` — diário de humor em uma nota rápida por dia, com visualização semanal. `nano-habits` — checklist de hábitos diários com streak. `nano-budget` — registro de gastos pessoais ultraleve. `nano-timer` — pomodoro minimalista sem distração visual. Sugestões de novos apps são bem-vindas via Issues.
+`nano-meds` — pronto. `nano-water` — pronto. `nano-mood` — diário de humor em uma nota rápida por dia, com visualização semanal. `nano-habits` — checklist de hábitos diários com streak. `nano-budget` — registro de gastos pessoais ultraleve. `nano-timer` — pomodoro minimalista sem distração visual. Sugestões de novos apps são bem-vindas via Issues.
 
 ## Licença
 
