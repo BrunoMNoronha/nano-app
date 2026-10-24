@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f4f8fb" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0d1620" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:,">
 <meta name="description" content="Registro de hidratação diária com meta configurável. Offline, sem conta.">
 <title>nano-water</title>
 <style>
@@ -15,7 +16,8 @@
   --text: #13212e;
   --muted: #5b6b7a;
   --line: #dde5ec;
-  --accent: #1f7ae0;
+  --accent: #1465bd;
+  --on-accent: #ffffff;
   --accent-soft: #e3effc;
   --done: #1a9a5c;
   --radius: 16px;
@@ -30,6 +32,7 @@
     --muted: #93a3b3;
     --line: #253443;
     --accent: #5aa6ff;
+    --on-accent: #0d1620;
     --accent-soft: #1b3047;
     --done: #3ccf8a;
   }
@@ -98,7 +101,7 @@ h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
   background: var(--surface);
   font-weight: 600;
 }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .btn-ghost { background: transparent; }
 .btn:disabled { opacity: .45; cursor: default; }
 .btn:active:not(:disabled) { transform: scale(.97); }
@@ -149,7 +152,7 @@ dialog label { display: flex; flex-direction: column; gap: 6px; font-weight: 600
 <body>
 <div class="app">
   <header>
-    <h1>💧 nano-water</h1>
+    <h1><svg width="22" height="26" viewBox="0 0 24 28" fill="currentColor" aria-hidden="true"><path d="M12 1C9 6 2 13 2 18a10 10 0 0 0 20 0C22 13 15 6 12 1Z"/></svg> nano-water</h1>
     <button class="icon-btn" id="open-settings" aria-label="Configurar meta">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
@@ -189,9 +192,11 @@ dialog label { display: flex; flex-direction: column; gap: 6px; font-weight: 600
   </div>
 </div>
 
-<dialog id="settings">
+<p id="storage-warning" role="status" hidden style="max-width:480px;margin:16px auto;padding:16px">Não foi possível acessar o armazenamento. Os registros desta sessão podem ser perdidos ao fechar ou recarregar.</p>
+
+<dialog id="settings" aria-labelledby="settings-title">
   <form method="dialog" id="settings-form">
-    <h2 style="color:var(--text)">Meta diária</h2>
+    <h2 id="settings-title" style="color:var(--text)">Meta diária</h2>
     <label>Meta (ml)
       <input class="field" id="goal-input" type="number" inputmode="numeric" min="250" max="10000" step="50" required>
     </label>
@@ -219,6 +224,7 @@ const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const $ = (id) => document.getElementById(id);
 
 // ===== Estado =====
+let storageFailed = false;
 let state = loadState();
 let currentDay = dayKey(new Date());
 
@@ -232,25 +238,45 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? migrate(JSON.parse(raw)) : emptyState();
   } catch {
+    storageFailed = true;
     return emptyState();
   }
 }
 
 function migrate(data) {
-  if (!data || typeof data !== 'object' || !data.days) return emptyState();
-  // Futuras versões de schema são convertidas aqui.
-  return { ...emptyState(), ...data, v: SCHEMA_VERSION };
+  if (!data || data.v !== SCHEMA_VERSION || typeof data.days !== 'object' ||
+      data.days === null || Array.isArray(data.days)) return emptyState();
+  const clean = emptyState();
+  if (validGoal(data.goal)) clean.goal = data.goal;
+  for (const [key, entries] of Object.entries(data.days)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || !Array.isArray(entries)) continue;
+    const date = new Date(`${key}T12:00:00`);
+    if (!Number.isFinite(date.getTime()) || dayKey(date) !== key) continue;
+    clean.days[key] = entries.filter((entry) => entry && validAmount(entry.ml) &&
+      Number.isFinite(entry.t) && Math.abs(entry.t) <= 8.64e15);
+  }
+  return clean;
 }
 
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    storageFailed = false;
   } catch {
-    showToast('Não foi possível salvar neste navegador');
+    storageFailed = true;
   }
+  $('storage-warning').hidden = !storageFailed;
 }
 
 // ===== Domínio =====
+function validAmount(ml) {
+  return Number.isInteger(ml) && ml >= 1 && ml <= 5000;
+}
+
+function validGoal(ml) {
+  return Number.isInteger(ml) && ml >= 250 && ml <= 10000 && ml % 50 === 0;
+}
+
 function dayKey(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -267,7 +293,8 @@ function totalFor(key) {
 }
 
 function addWater(ml) {
-  if (!Number.isFinite(ml) || ml <= 0) return;
+  if (!validAmount(ml)) return;
+  checkDayChange();
   const key = dayKey(new Date());
   state.days[key] = [...entriesFor(key), { t: Date.now(), ml }];
   pruneHistory();
@@ -277,6 +304,7 @@ function addWater(ml) {
 }
 
 function undoLast() {
+  checkDayChange();
   const key = dayKey(new Date());
   const entries = entriesFor(key);
   if (!entries.length) return;
@@ -288,6 +316,8 @@ function undoLast() {
 }
 
 function setGoal(ml) {
+  if (!validGoal(ml)) return;
+  checkDayChange();
   state.goal = ml;
   saveState();
   render();
@@ -295,10 +325,10 @@ function setGoal(ml) {
 
 function pruneHistory() {
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - HISTORY_DAYS);
+  cutoff.setDate(cutoff.getDate() - (HISTORY_DAYS - 1));
   const cutoffKey = dayKey(cutoff);
   for (const key of Object.keys(state.days)) {
-    if (key < cutoffKey) delete state.days[key];
+    if (key < cutoffKey || key > dayKey(new Date())) delete state.days[key];
   }
 }
 
@@ -340,7 +370,9 @@ function renderWeek(todayKey) {
     const pct = Math.min(total / state.goal, 1) * 100;
     const col = document.createElement('div');
     col.className = 'day' + (key === todayKey ? ' is-today' : '');
-    col.setAttribute('aria-label', `${WEEKDAYS[date.getDay()]}: ${total} ml`);
+    col.setAttribute('role', 'img');
+    col.setAttribute('aria-label', `${date.toLocaleDateString('pt-BR')}: ${total} ml de ${state.goal} ml`);
+    col.title = `${date.toLocaleDateString('pt-BR')}: ${total} ml`;
     const bar = document.createElement('div');
     bar.className = 'day-bar' + (total >= state.goal ? ' is-done' : '');
     bar.style.height = `${pct}%`;
@@ -406,6 +438,7 @@ function bindEvents() {
   $('undo').addEventListener('click', undoLast);
 
   $('open-settings').addEventListener('click', () => {
+    $('settings').returnValue = '';
     $('goal-input').value = state.goal;
     $('settings').showModal();
   });
@@ -415,20 +448,36 @@ function bindEvents() {
     if ($('settings').returnValue === 'save' && ml >= 250) setGoal(ml);
   });
 
-  // Virada do dia: re-renderiza ao voltar para o app ou a cada minuto.
-  const checkDayChange = () => {
-    const key = dayKey(new Date());
-    if (key !== currentDay) {
-      currentDay = key;
-      render();
-    }
-  };
+
   document.addEventListener('visibilitychange', checkDayChange);
-  setInterval(checkDayChange, 60_000);
+  window.addEventListener('focus', checkDayChange);
+  scheduleMidnight();
+}
+
+// O timer pode ser suspenso em segundo plano; foco e visibilidade cobrem o retorno.
+function checkDayChange() {
+  const key = dayKey(new Date());
+  if (key === currentDay) return;
+  currentDay = key;
+  pruneHistory();
+  saveState();
+  render();
+}
+
+function scheduleMidnight() {
+  const now = new Date();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  setTimeout(function onMidnight() {
+    checkDayChange();
+    scheduleMidnight();
+  }, Math.max(100, midnight - now));
 }
 
 // ===== Init =====
 function init() {
+  pruneHistory();
+  if (!storageFailed) saveState();
+  $('storage-warning').hidden = !storageFailed;
   renderQuickButtons();
   bindEvents();
   render();
