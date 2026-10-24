@@ -28,7 +28,7 @@ No momento o repositório contém os seguintes apps:
 
 `nano-meds.html` — Gestão de remédios com marcação de doses diárias. Você cadastra cada remédio (nome, dosagem, frequência), e o app gera cápsulas tocáveis para registrar cada dose tomada ao longo do dia. As cápsulas resetam automaticamente na virada do dia, e o histórico recente fica armazenado localmente para futuras visualizações de adesão.
 
-`nano-water.html` — Registro de hidratação diária com meta configurável. Botões rápidos (200/300/500 ml) ou valor livre, anel de progresso do dia, desfazer o último registro e barras dos últimos 7 dias; o histórico de 30 dias fica salvo localmente.
+`nano-water.html` — Registro de hidratação diária com meta configurável. Botões rápidos (200/300/500 ml) ou valor livre, anel de progresso do dia, desfazer o último registro e barras dos últimos 7 dias; o histórico dos últimos 30 dias (incluindo hoje) fica salvo localmente, com virada automática pela data local e aviso se o armazenamento falhar.
 
 Outros apps estão planejados — veja a seção [Roadmap](#roadmap).
 
@@ -65,6 +65,7 @@ A estrutura é deliberadamente plana. Cada nano-app é um arquivo na raiz, com n
 ```
 nano-app/
 ├── nano-meds.html        # Gestão de remédios e doses
+├── nano-water.html       # Hidratação diária e histórico
 ├── docs/                 # Convenções e notas de design (opcional)
 ├── LICENSE
 └── README.md
@@ -106,7 +107,7 @@ Para ajustes em apps existentes (correções, melhorias de UX, otimizações), o
 
 A lista abaixo são ideias planejadas, sem ordem fixa nem compromisso de prazo. Servem mais para indicar a direção e convidar contribuições do que para prometer entregas.
 
-`nano-meds` — pronto. `nano-water` — pronto. `nano-mood` — diário de humor em uma nota rápida por dia, com visualização semanal. `nano-habits` — checklist de hábitos diários com streak. `nano-budget` — registro de gastos pessoais ultraleve. `nano-timer` — pomodoro minimalista sem distração visual. Sugestões de novos apps são bem-vindas via Issues.
+`nano-meds` — pronto. `nano-water` — pronto (meta, registros, desfazer e histórico local). `nano-mood` — diário de humor em uma nota rápida por dia, com visualização semanal. `nano-habits` — checklist de hábitos diários com streak. `nano-budget` — registro de gastos pessoais ultraleve. `nano-timer` — pomodoro minimalista sem distração visual. Sugestões de novos apps são bem-vindas via Issues.
 
 ## Licença
 
