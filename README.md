@@ -30,6 +30,8 @@ No momento o repositório contém os seguintes apps:
 
 `nano-water.html` — Registro de hidratação diária com meta configurável. Botões rápidos (200/300/500 ml) ou valor livre, anel de progresso do dia, desfazer o último registro e barras dos últimos 7 dias; o histórico dos últimos 30 dias (incluindo hoje) fica salvo localmente, com virada automática pela data local e aviso se o armazenamento falhar.
 
+`nano-weight.html` — Registro de pesagens por Bluetooth Low Energy quando a balança expõe o serviço padrão, com entrada manual, histórico local e diagnóstico de pacotes para outros serviços BLE. A compatibilidade Bluetooth depende do navegador e do protocolo da balança.
+
 Outros apps estão planejados — veja a seção [Roadmap](#roadmap).
 
 ## Como usar
@@ -66,6 +68,7 @@ A estrutura é deliberadamente plana. Cada nano-app é um arquivo na raiz, com n
 nano-app/
 ├── nano-meds.html        # Gestão de remédios e doses
 ├── nano-water.html       # Hidratação diária e histórico
+├── nano-weight.html      # Pesagens e diagnóstico BLE
 ├── docs/                 # Convenções e notas de design (opcional)
 ├── LICENSE
 └── README.md
@@ -107,7 +110,7 @@ Para ajustes em apps existentes (correções, melhorias de UX, otimizações), o
 
 A lista abaixo são ideias planejadas, sem ordem fixa nem compromisso de prazo. Servem mais para indicar a direção e convidar contribuições do que para prometer entregas.
 
-`nano-meds` — pronto. `nano-water` — pronto (meta, registros, desfazer e histórico local). `nano-mood` — diário de humor em uma nota rápida por dia, com visualização semanal. `nano-habits` — checklist de hábitos diários com streak. `nano-budget` — registro de gastos pessoais ultraleve. `nano-timer` — pomodoro minimalista sem distração visual. Sugestões de novos apps são bem-vindas via Issues.
+`nano-meds` — pronto. `nano-water` — pronto (meta, registros, desfazer e histórico local). `nano-weight` — pronto para testes com balança real. `nano-mood` — diário de humor em uma nota rápida por dia, com visualização semanal. `nano-habits` — checklist de hábitos diários com streak. `nano-budget` — registro de gastos pessoais ultraleve. `nano-timer` — pomodoro minimalista sem distração visual. Sugestões de novos apps são bem-vindas via Issues.
 
 ## Licença
 
