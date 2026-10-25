@@ -167,6 +167,7 @@ function receive(value, name, standard = false) {
   setStatus('Pesagem recebida; confirme para salvar');
 }
 function cleanup() {
+  device?.removeEventListener('gattserverdisconnected',onDisconnected);
   for (const [characteristic,handler] of listeners) characteristic.removeEventListener('characteristicvaluechanged',handler);
   listeners = [];
   device = null;
@@ -229,27 +230,49 @@ async function connect(explore) {
     });
   } catch(error) { setStatus(`Seleção falhou: ${error.message}`); return; }
   busy = true; $('connect').disabled = true; $('explore').disabled = true;
+  let stage = 'seleção';
+  let started = Date.now();
+  $('support').hidden = true;
+  log(`Diagnóstico v2; modo=${explore ? 'exploratório' : 'padrão'}; contexto seguro=${window.isSecureContext}; navegador=${navigator.userAgent}`);
   try {
     disconnect();
     device = await selection;
     device.addEventListener('gattserverdisconnected',onDisconnected);
     log(`Dispositivo selecionado: ${device.name || 'sem nome'}`);
-    setStatus('Conectando…');
+    stage = 'conexão GATT';
+    started = Date.now();
+    log('Iniciando conexão GATT; nenhum serviço foi consultado ainda.');
+    setStatus('Conectando; mantenha a balança ligada…');
     const server = await device.gatt.connect();
+    log(`GATT conectado em ${((Date.now()-started)/1000).toFixed(1)} s.`);
+    stage = 'descoberta de serviços';
     $('disconnect').disabled = false;
     const standard = await inspectService(server,WEIGHT_SERVICE,WEIGHT_CHAR,true);
     if (explore || !standard) await inspectService(server,BODY_SERVICE,BODY_CHAR,false);
     if (customService) await inspectService(server,customService,customChar,false);
     setStatus(standard ? 'Conectado; suba na balança' : 'Conectado; veja o diagnóstico');
   } catch(error) {
-    if (error.name !== 'NotFoundError') { log(`Erro: ${error.name}: ${error.message}`); setStatus(`Falha: ${error.message}`); }
-    else setStatus('Seleção cancelada');
+    if (stage === 'seleção' && error.name === 'NotFoundError') {
+      log('Seleção cancelada ou nenhum dispositivo selecionado.');
+      setStatus('Seleção cancelada');
+    } else {
+      log(`Falha na etapa ${stage} após ${((Date.now()-started)/1000).toFixed(1)} s: ${error.name}: ${error.message}`);
+      setStatus(`Falha na etapa: ${stage}`);
+      $('support').hidden = false;
+      $('support').textContent = stage === 'conexão GATT'
+        ? 'A conexão falhou antes da leitura. Feche o aplicativo da balança em outros aparelhos, mantenha o visor ligado e o celular próximo; tente novamente. Se repetir, confirme que o dispositivo selecionado é a balança. O erro sozinho não identifica a causa nem o protocolo.'
+        : 'Não foi possível concluir esta etapa. Copie o relatório de diagnóstico para análise.';
+      $('diagnostics').open = true;
+    }
     const message = $('status').textContent;
     disconnect();
     setStatus(message);
   } finally { busy = false; $('connect').disabled = false; $('explore').disabled = false; }
 }
-function onDisconnected() { cleanup(); log('Dispositivo desconectado.'); }
+function onDisconnected(event) {
+  if (event.target !== device) return;
+  cleanup(); log('Dispositivo desconectado.');
+}
 // Interface
 function render() {
   const last = records.at(-1);
